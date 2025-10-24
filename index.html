@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>番号チャット（フル版）</title>
+<title>しんぞRTT</title>
 <style>
 body {
     font-family: "Segoe UI", sans-serif;
@@ -24,6 +24,18 @@ input, button, select {
     padding: 10px;
     margin: 6px;
     border-radius: 8px;
+}
+#logoutBtn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 6px 10px;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
 }
 #chatUI {
     display: none;
@@ -178,6 +190,7 @@ input, button, select {
 
 <!-- 部屋選択 -->
 <div id="roomSelect" class="section" style="display:none;">
+    <button id="logoutBtn">ログアウト</button>
     <h2>番号チャット</h2>
     <label>自分の色：</label>
     <select id="colorInput">
@@ -251,6 +264,7 @@ const sendBtn = document.getElementById("sendBtn");
 const imageInput = document.getElementById("imageInput");
 const stamps = document.querySelectorAll("#stamp-area img");
 const closeBtn = document.getElementById("closeBtn");
+const logoutBtn = document.getElementById("logoutBtn");
 
 let currentUser = null;
 let currentRoom = "";
@@ -268,6 +282,9 @@ function getCookie(key){
         if(k===key) return v;
     }
     return "";
+}
+function deleteCookie(key){
+    document.cookie = key+"=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;";
 }
 
 // 自動ログイン
@@ -314,6 +331,14 @@ loginBtn.onclick=async()=>{
     setCookie("chatName",name,365);
     accountUI.style.display="none";
     roomSelect.style.display="flex";
+};
+
+// ログアウト
+logoutBtn.onclick=()=>{
+    deleteCookie("chatName");
+    currentUser=null;
+    roomSelect.style.display="none";
+    accountUI.style.display="flex";
 };
 
 // 部屋入室
