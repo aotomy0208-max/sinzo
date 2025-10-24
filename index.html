@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>番号チャット（部屋版）</title>
+<title>番号チャット（ID管理版）</title>
 <style>
 body {font-family:"Segoe UI",sans-serif;margin:0;padding:0;background:#e5efff;}
 #roomSelect, #chatUI {display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}
 #roomSelect input, #roomSelect button, #roomSelect select {font-size:20px;padding:10px;margin:6px;border-radius:8px;}
-#chatUI {display:none;height:100vh;}
+#chatUI {display:none;height:100vh;width:100%;}
 #chat-header {background:#3a7bfd;color:white;padding:15px;font-size:20px;width:100%;text-align:center;position:sticky;top:0;}
 #chat-area {flex:1;width:100%;overflow-y:auto;padding:15px;background:#f2f5ff;}
 .message-box {display:flex;margin:10px 0;align-items:flex-end;max-width:90%;word-wrap:break-word;}
@@ -34,7 +34,8 @@ body {font-family:"Segoe UI",sans-serif;margin:0;padding:0;background:#e5efff;}
 <body>
 
 <div id="roomSelect">
-  <h2>しんぞRTT</h2>  <input type="text" id="nameInput" placeholder="名前を入力"><br>
+  <h2>番号チャット</h2>
+  <input type="text" id="nameInput" placeholder="名前を入力"><br>
   <label>自分の色：</label>
   <select id="colorInput">
     <option value="#3a7bfd">青</option>
@@ -81,20 +82,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebas
 import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, updateDoc, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
 
-// Firebase設定
-const firebaseConfig = {
-  apiKey: "AIzaSyC9ygh6HjX5mK1e5ZBnEWnLQCEjRMKIEWA",
-  authDomain: "sinzo-3f972.firebaseapp.com",
-  projectId: "sinzo-3f972",
-  storageBucket: "sinzo-3f972.firebasestorage.app",
-  messagingSenderId: "1058985227031",
-  appId: "1:1058985227031:web:2e3a31346805442e10bd52"
-};
+// Firebase
+const firebaseConfig = {apiKey:"AIzaSyC9ygh6HjX5mK1e5ZBnEWnLQCEjRMKIEWA",authDomain:"sinzo-3f972.firebaseapp.com",projectId:"sinzo-3f972",storageBucket:"sinzo-3f972.firebasestorage.app",messagingSenderId:"1058985227031",appId:"1:1058985227031:web:2e3a31346805442e10bd52"};
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-// 要素
+// Elements
 const roomSelect = document.getElementById("roomSelect");
 const chatUI = document.getElementById("chatUI");
 const chatHeader = document.getElementById("chat-header");
@@ -111,50 +105,49 @@ const stamps = document.querySelectorAll("#stamp-area img");
 const closeBtn = document.getElementById("closeBtn");
 const adminBtn = document.getElementById("adminBtn");
 
-let userName = "";
-let color = "";
-let room = "";
+let userName="", color="", room="";
 
-// ===== クッキー管理 =====
-function setCookie(key,val,days){const d=new Date();d.setTime(d.getTime()+(days*24*60*60*1000));document.cookie=`${key}=${val};expires=${d.toUTCString()};path=/`;}
-function getCookie(key){const pairs=document.cookie.split("; ");for(let p of pairs){const [k,v]=p.split("=");if(k===key)return v;}return"";}
+// Cookie
+function setCookie(k,v,d){const date=new Date();date.setTime(date.getTime()+(d*24*60*60*1000));document.cookie=`${k}=${v};expires=${date.toUTCString()};path=/`;}
+function getCookie(k){const pairs=document.cookie.split("; ");for(let p of pairs){const [key,val]=p.split("=");if(key===k)return val;}return"";}
+window.addEventListener("load",()=>{const n=getCookie("chatName");if(n)nameInput.value=n;});
 
-// ===== 名前自動復元 =====
-window.addEventListener("load",()=>{const savedName=getCookie("chatName");if(savedName)nameInput.value=savedName;});
-
-// ===== 部屋入室/作成 =====
+// Room
 function enterRoom(){userName=nameInput.value.trim();color=colorInput.value;room=roomInput.value.trim();if(!userName||!room)return alert("名前と部屋番号を入力");setCookie("chatName",userName,365);roomSelect.style.display="none";chatUI.style.display="flex";chatHeader.textContent=`部屋番号：${room}`;startChat();}
 enterBtn.onclick=enterRoom;createBtn.onclick=enterRoom;
 
-// ===== チャット =====
+// Chat
 function startChat(){
   const roomRef=collection(db,"rooms",room,"messages");
   const q=query(roomRef,orderBy("time"));
+  const messageDOM={};
   onSnapshot(q,(snapshot)=>{
-    chatArea.innerHTML="";
-    snapshot.forEach(async(docSnap)=>{
-      const msg=docSnap.data();
-      const box=document.createElement("div");
-      box.className="message-box "+(msg.name===userName?"me":"other");
-      const bubble=document.createElement("div");
-      bubble.className="bubble";
-      if(msg.name===userName)bubble.classList.add("me");
-      bubble.style.background=msg.color||"#fff";
-      if(msg.type==="text"){bubble.textContent=msg.text;}
-      else if(msg.type==="stamp"){const img=document.createElement("img");img.src=msg.src;img.style.width="60px";bubble.appendChild(img);}
-      else if(msg.type==="image"){const img=document.createElement("img");img.src=msg.src;img.style.width="200px";img.style.borderRadius="10px";bubble.appendChild(img);}
-      const time=document.createElement("div");time.className="time";if(msg.time?.toDate){const t=msg.time.toDate();time.textContent=`${t.getHours().toString().padStart(2,"0")}:${t.getMinutes().toString().padStart(2,"0")}`;}
-      const nameTag=document.createElement("div");nameTag.className="name";nameTag.textContent=msg.name;
-      const readmark=document.createElement("div");readmark.className="readmark";readmark.textContent=msg.read?"既読":"";
-      if(msg.name===userName){box.append(bubble,nameTag,time,readmark);}
-      else{box.append(nameTag,bubble,time);await updateDoc(doc(roomRef,docSnap.id),{read:true});}
-      chatArea.appendChild(box);
+    snapshot.docChanges().forEach(async change=>{
+      const msg=change.doc.data();
+      const id=change.doc.id;
+      let box=document.getElementById(id);
+      if(change.type==="removed"){if(box)box.remove(); return;}
+      if(!box){
+        box=document.createElement("div");box.id=id;box.className="message-box "+(msg.name===userName?"me":"other");
+        const bubble=document.createElement("div");bubble.className="bubble";if(msg.name===userName)bubble.classList.add("me");bubble.style.background=msg.color||"#fff";
+        if(msg.type==="text"){bubble.textContent=msg.text;}
+        else if(msg.type==="stamp"){const img=document.createElement("img");img.src=msg.src;img.style.width="60px";bubble.appendChild(img);}
+        else if(msg.type==="image"){const img=document.createElement("img");img.src=msg.src;img.style.width="200px";img.style.borderRadius="10px";bubble.appendChild(img);}
+        const time=document.createElement("div");time.className="time";if(msg.time?.toDate){const t=msg.time.toDate();time.textContent=`${t.getHours().toString().padStart(2,"0")}:${t.getMinutes().toString().padStart(2,"0")}`;}
+        const nameTag=document.createElement("div");nameTag.className="name";nameTag.textContent=msg.name;
+        const readmark=document.createElement("div");readmark.className="readmark";readmark.textContent=msg.read?"既読":"";
+        if(msg.name===userName){box.append(bubble,nameTag,time,readmark);}else{box.append(nameTag,bubble,time);}
+        chatArea.appendChild(box);chatArea.scrollTop=chatArea.scrollHeight;
+      }
+      else{ // 既存メッセージ更新
+        const readmark=box.querySelector(".readmark");if(readmark)readmark.textContent=msg.read?"既読":"";
+      }
+      if(msg.name!==userName)await updateDoc(doc(roomRef,id),{read:true});
     });
-    chatArea.scrollTop=chatArea.scrollHeight;
   });
 }
 
-// ===== テキスト送信 =====
+// Send
 sendBtn.onclick=async()=>{
   const text=msgInput.value.trim();if(!text)return;
   const roomRef=collection(db,"rooms",room,"messages");
@@ -162,19 +155,19 @@ sendBtn.onclick=async()=>{
   msgInput.value="";
 }
 
-// ===== スタンプ送信 =====
+// Stamp
 stamps.forEach(img=>{img.onclick=async()=>{const roomRef=collection(db,"rooms",room,"messages");await addDoc(roomRef,{name:userName,type:"stamp",src:img.src,color:color,time:serverTimestamp(),read:false});};});
 
-// ===== 画像送信 =====
+// Image
 imageInput.onchange=async(e)=>{const file=e.target.files[0];if(!file)return;const storageRef=ref(storage,`uploads/${room}/${Date.now()}_${file.name}`);await uploadBytes(storageRef,file);const url=await getDownloadURL(storageRef);const roomRef=collection(db,"rooms",room,"messages");await addDoc(roomRef,{name:userName,type:"image",src:url,color:color,time:serverTimestamp(),read:false});};
 
-// ===== 閉じる =====
+// Close
 closeBtn.onclick=()=>{chatUI.style.display="none";roomSelect.style.display="flex";chatArea.innerHTML="";}
 
-// ===== 管理者削除 =====
+// Admin delete
 adminBtn.onclick=async()=>{
-  const pw=prompt("管理者パスワードを入力");if(pw!=="2059")return alert("パスワード違う");
-  const delId=prompt("削除するメッセージのIDを入力");if(!delId)return;
+  const pw=prompt("管理者パスワード");if(pw!=="2059")return alert("パスワード違う");
+  const delId=prompt("削除するメッセージのID");if(!delId)return;
   try{await deleteDoc(doc(db,"rooms",room,"messages",delId));alert("削除しました");}catch(e){alert("削除できません");}
 }
 </script>
