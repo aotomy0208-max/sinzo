@@ -3,13 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>番号チャット（LINE風 Firestore）</title>
+<title>番号チャット（LINE風 完全版）</title>
 <style>
 body {
   font-family: "Segoe UI", sans-serif;
   background: #e5efff;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
 }
 #login {
   text-align: center;
@@ -17,6 +20,8 @@ body {
 }
 #chatUI {
   display: none;
+  flex-direction: column;
+  height: 100%;
 }
 #chat-header {
   background: #3a7bfd;
@@ -24,12 +29,14 @@ body {
   padding: 10px;
   text-align: center;
   font-weight: bold;
+  position: sticky;
+  top: 0;
 }
 #chat-area {
-  height: 420px;
+  flex: 1;
   overflow-y: auto;
-  padding: 10px;
-  background: #f2f5ff;
+  padding: 15px;
+  background: #f3f5ff;
 }
 .message-box {
   display: flex;
@@ -56,21 +63,33 @@ body {
   color: #666;
   margin: 0 8px;
 }
-input, button, select {
-  font-size: 16px;
-  padding: 8px;
-  margin: 5px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-}
 #send-area {
   display: flex;
-  justify-content: center;
   align-items: center;
-  padding: 10px;
+  padding: 8px;
+  background: white;
+  border-top: 1px solid #ccc;
+  position: sticky;
+  bottom: 0;
 }
 #msgInput {
   flex: 1;
+  font-size: 16px;
+  padding: 8px;
+  margin-right: 5px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #3a7bfd;
+  color: white;
+  cursor: pointer;
+}
+button:disabled {
+  background: #999;
 }
 #stamp-area {
   text-align: center;
@@ -82,6 +101,15 @@ input, button, select {
   width: 45px;
   cursor: pointer;
   margin: 5px;
+}
+#imageInput {
+  display: none;
+}
+#preview {
+  max-width: 120px;
+  display: none;
+  margin-left: 10px;
+  border-radius: 8px;
 }
 </style>
 </head>
@@ -96,6 +124,11 @@ input, button, select {
     <option value="#ff69b4">ピンク</option>
     <option value="#ff9800">オレンジ</option>
     <option value="#9c27b0">紫</option>
+    <option value="#795548">茶</option>
+    <option value="#2196f3">水色</option>
+    <option value="#607d8b">グレー</option>
+    <option value="#f44336">赤</option>
+    <option value="#00bcd4">ターコイズ</option>
   </select><br>
   <input type="text" id="roomInput" placeholder="部屋番号を入力"><br>
   <button id="enterBtn">入室</button>
@@ -106,23 +139,31 @@ input, button, select {
   <div id="chat-area"></div>
 
   <div id="send-area">
+    <input type="file" id="imageInput" accept="image/*">
+    <button id="imgBtn">📷</button>
+    <img id="preview">
     <input type="text" id="msgInput" placeholder="メッセージを入力">
     <button id="sendBtn">送信</button>
   </div>
 
   <div id="stamp-area">
-    <img src="https://em-content.zobj.net/thumbs/240/apple/354/thumbs-up_1f44d.png" alt="👍">
-    <img src="https://em-content.zobj.net/thumbs/240/apple/354/red-heart_2764-fe0f.png" alt="❤️">
-    <img src="https://em-content.zobj.net/thumbs/240/apple/354/fire_1f525.png" alt="🔥">
-    <img src="https://em-content.zobj.net/thumbs/240/apple/354/face-with-tears-of-joy_1f602.png" alt="😂">
-    <img src="https://em-content.zobj.net/thumbs/240/apple/354/clapping-hands_1f44f.png" alt="👏">
-    <img src="https://em-content.zobj.net/thumbs/240/apple/354/sparkles_2728.png" alt="✨">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/thumbs-up_1f44d.png">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/red-heart_2764-fe0f.png">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/fire_1f525.png">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/face-with-tears-of-joy_1f602.png">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/clapping-hands_1f44f.png">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/sparkles_2728.png">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/eyes_1f440.png">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/party-popper_1f389.png">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/thumbs-down_1f44e.png">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/crying-face_1f622.png">
   </div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
 
 // Firebase設定
 const firebaseConfig = {
@@ -134,9 +175,9 @@ const firebaseConfig = {
   appId: "1:1058985227031:web:2e3a31346805442e10bd52"
 };
 
-// 初期化
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 // 要素
 const login = document.getElementById("login");
@@ -150,10 +191,14 @@ const enterBtn = document.getElementById("enterBtn");
 const msgInput = document.getElementById("msgInput");
 const sendBtn = document.getElementById("sendBtn");
 const stamps = document.querySelectorAll("#stamp-area img");
+const imageInput = document.getElementById("imageInput");
+const imgBtn = document.getElementById("imgBtn");
+const preview = document.getElementById("preview");
 
 let room = "";
 let userName = "";
 let color = "";
+let lastSend = 0;
 
 // 入室
 enterBtn.onclick = () => {
@@ -162,12 +207,12 @@ enterBtn.onclick = () => {
   room = roomInput.value.trim();
   if (!userName || !room) return alert("名前と部屋番号を入力してね。");
   login.style.display = "none";
-  chatUI.style.display = "block";
+  chatUI.style.display = "flex";
   roomLabel.textContent = `部屋番号：${room}`;
   startChat();
 };
 
-// Firestoreリアルタイム読み込み
+// チャット読み込み
 function startChat() {
   const roomRef = collection(db, "rooms", room, "messages");
   const q = query(roomRef, orderBy("time"));
@@ -188,6 +233,12 @@ function startChat() {
         img.src = msg.src;
         img.style.width = "50px";
         bubble.appendChild(img);
+      } else if (msg.type === "image") {
+        const img = document.createElement("img");
+        img.src = msg.src;
+        img.style.maxWidth = "200px";
+        img.style.borderRadius = "8px";
+        bubble.appendChild(img);
       }
       const nameTag = document.createElement("div");
       nameTag.className = "name";
@@ -205,10 +256,22 @@ function startChat() {
   });
 }
 
+// 10秒クールダウン制御
+function canSend() {
+  const now = Date.now();
+  if (now - lastSend < 10000) {
+    alert("10秒待ってね。");
+    return false;
+  }
+  lastSend = now;
+  return true;
+}
+
 // テキスト送信
 sendBtn.onclick = async () => {
   const text = msgInput.value.trim();
   if (!text) return;
+  if (!canSend()) return;
   const roomRef = collection(db, "rooms", room, "messages");
   await addDoc(roomRef, {
     name: userName,
@@ -223,6 +286,7 @@ sendBtn.onclick = async () => {
 // スタンプ送信
 stamps.forEach(img => {
   img.onclick = async () => {
+    if (!canSend()) return;
     const roomRef = collection(db, "rooms", room, "messages");
     await addDoc(roomRef, {
       name: userName,
@@ -233,6 +297,39 @@ stamps.forEach(img => {
     });
   };
 });
+
+// 画像プレビュー
+imgBtn.onclick = () => imageInput.click();
+imageInput.onchange = () => {
+  const file = imageInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.src = e.target.result;
+    preview.style.display = "inline";
+  };
+  reader.readAsDataURL(file);
+};
+
+// 画像送信
+preview.onclick = async () => {
+  const file = imageInput.files[0];
+  if (!file) return;
+  if (!canSend()) return;
+  const storageRef = sRef(storage, "rooms/" + room + "/" + Date.now() + "_" + file.name);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  const roomRef = collection(db, "rooms", room, "messages");
+  await addDoc(roomRef, {
+    name: userName,
+    type: "image",
+    src: url,
+    color: color,
+    time: serverTimestamp()
+  });
+  preview.style.display = "none";
+  imageInput.value = "";
+};
 </script>
 </body>
 </html>
