@@ -1,188 +1,167 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>しんぞビデオコネクト</title>
-  <style>
-    body { font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; background:#f5f7fb; color:#111; padding:20px; }
-    h1 { font-size:20px; margin:0 0 12px; }
-    .container { max-width:900px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
-    .panel { background:#fff; border-radius:10px; padding:12px; box-shadow:0 4px 12px rgba(0,0,0,0.06); }
-    video { width:100%; height:320px; background:#000; border-radius:6px; object-fit:cover; }
-    label { display:block; margin:8px 0 4px; font-size:14px; }
-    input[type="text"] { width:100%; padding:8px; border-radius:6px; border:1px solid #ddd; font-size:14px; }
-    .controls { display:flex; gap:8px; margin-top:8px; }
-    button { padding:8px 12px; border-radius:8px; border:0; background:#2563eb; color:#fff; cursor:pointer; font-weight:600; }
-    button.secondary { background:#475569; }
-    .small { font-size:13px; color:#555; margin-top:8px; }
-    footer { margin-top:16px; font-size:13px; color:#666; }
-    @media (max-width:700px){ .container{ grid-template-columns:1fr; } video{ height:240px; } }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>番号チャット（Firestore）</title>
+<style>
+body {
+  font-family: sans-serif;
+  background: #eef4ff;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
+#chat-area {
+  max-width: 600px;
+  margin: 20px auto;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 0 10px #ccc;
+  padding: 10px;
+  height: 400px;
+  overflow-y: auto;
+  text-align: left;
+}
+.message {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  display: inline-block;
+  max-width: 80%;
+  word-wrap: break-word;
+}
+.me { background: #d2eaff; }
+.other { background: #eee; }
+input, button {
+  font-size: 16px;
+  padding: 8px;
+  margin: 5px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+#stamp-area img {
+  width: 40px;
+  cursor: pointer;
+  margin: 5px;
+}
+</style>
 </head>
 <body>
-  <h1>しんぞビデオコネクト</h1>
-  <div class="container">
-    <div class="panel">
-      <div>
-        <label for="roomInput">ルーム番号（同じ番号を相手と入力してください）</label>
-        <input id="roomInput" type="text" placeholder="例: 1234" />
-        <div class="controls">
-          <button id="startBtn">開始</button>
-          <button id="hangupBtn" class="secondary">退室</button>
-        </div>
-        <div class="small">
-          操作手順：両者が同じルーム番号を入力して「開始」を押す。片方が先に押すとルームを作成し、もう片方が押すと参加します。
-        </div>
-      </div>
-    </div>
+<h1>番号チャット</h1>
 
-    <div class="panel">
-      
-      <div style="margin-top:10px;">
-        <label>相手の映像</label>
-        <video id="remoteVideo" playsinline autoplay></video>
-      <div>
-        <label>自分の映像</label>
-        <video id="localVideo" playsinline autoplay muted></video>
-      </div>
-      </div>
-    </div>
+<div id="login">
+  <input type="text" id="roomInput" placeholder="部屋番号を入力">
+  <button id="enterBtn">入室</button>
+</div>
+
+<div id="chatUI" style="display:none;">
+  <h2 id="roomLabel"></h2>
+  <div id="chat-area"></div>
+  <input type="text" id="msgInput" placeholder="メッセージを入力">
+  <button id="sendBtn">送信</button>
+
+  <div id="stamp-area">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/thumbs-up_1f44d.png" alt="👍">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/red-heart_2764-fe0f.png" alt="❤️">
+    <img src="https://em-content.zobj.net/thumbs/240/apple/354/fire_1f525.png" alt="🔥">
   </div>
+</div>
 
-  <footer>
-    <div></div>
-  </footer>
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-  <!-- Firebase CDN（非モジュール形式） -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  // Firebase設定
+  const firebaseConfig = {
+    apiKey: "AIzaSyC9ygh6HjX5mK1e5ZBnEWnLQCEjRMKIEWA",
+    authDomain: "sinzo-3f972.firebaseapp.com",
+    projectId: "sinzo-3f972",
+    storageBucket: "sinzo-3f972.firebasestorage.app",
+    messagingSenderId: "1058985227031",
+    appId: "1:1058985227031:web:2e3a31346805442e10bd52"
+  };
 
-  <script>
-    // --- Firebase設定 ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyC9ygh6HjX5mK1e5ZBnEWnLQCEjRMKIEWA",
-      authDomain: "sinzo-3f972.firebaseapp.com",
-      projectId: "sinzo-3f972",
-      storageBucket: "sinzo-3f972.firebasestorage.app",
-      messagingSenderId: "1058985227031",
-      appId: "1:1058985227031:web:2e3a31346805442e10bd52"
-    };
+  // 初期化
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-    firebase.initializeApp(firebaseConfig);
-    const firestore = firebase.firestore();
+  // 要素取得
+  const login = document.getElementById("login");
+  const chatUI = document.getElementById("chatUI");
+  const roomInput = document.getElementById("roomInput");
+  const enterBtn = document.getElementById("enterBtn");
+  const roomLabel = document.getElementById("roomLabel");
+  const chatArea = document.getElementById("chat-area");
+  const msgInput = document.getElementById("msgInput");
+  const sendBtn = document.getElementById("sendBtn");
+  const stamps = document.querySelectorAll("#stamp-area img");
 
-    const localVideo = document.getElementById('localVideo');
-    const remoteVideo = document.getElementById('remoteVideo');
-    const roomInput = document.getElementById('roomInput');
-    const startBtn = document.getElementById('startBtn');
-    const hangupBtn = document.getElementById('hangupBtn');
+  let room = "";
+  let userId = "u" + Math.random().toString(36).substring(2, 9);
 
-    let pc = null;
-    let localStream = null;
-    let remoteStream = null;
-    let roomRef = null;
-    let isCaller = false;
+  // 入室処理
+  enterBtn.onclick = async () => {
+    room = roomInput.value.trim();
+    if (!room) return alert("部屋番号を入力してね。");
 
-    const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    roomLabel.textContent = "部屋番号：" + room;
+    login.style.display = "none";
+    chatUI.style.display = "block";
+    startChat();
+  };
 
-    async function startLocalStream() {
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        localVideo.srcObject = localStream;
-      } catch (e) {
-        alert('カメラまたはマイクの許可が必要です。');
-        throw e;
-      }
-    }
-
-    function createPeerConnection() {
-      pc = new RTCPeerConnection(configuration);
-      remoteStream = new MediaStream();
-      remoteVideo.srcObject = remoteStream;
-
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-      pc.ontrack = event => {
-        event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
-      };
-
-      pc.onicecandidate = async event => {
-        if (event.candidate) {
-          const candidate = event.candidate.toJSON();
-          const candidatesCollection = isCaller
-            ? roomRef.collection('callerCandidates')
-            : roomRef.collection('calleeCandidates');
-          await candidatesCollection.add(candidate);
+  // チャット読み込み開始
+  function startChat() {
+    const roomRef = collection(db, "rooms", room, "messages");
+    const q = query(roomRef, orderBy("time"));
+    onSnapshot(q, (snapshot) => {
+      chatArea.innerHTML = "";
+      snapshot.forEach((doc) => {
+        const msg = doc.data();
+        const div = document.createElement("div");
+        div.className = "message " + (msg.user === userId ? "me" : "other");
+        if (msg.type === "text") {
+          div.textContent = msg.text;
+        } else if (msg.type === "stamp") {
+          const img = document.createElement("img");
+          img.src = msg.src;
+          img.style.width = "40px";
+          div.appendChild(img);
         }
-      };
-    }
+        chatArea.appendChild(div);
+      });
+      chatArea.scrollTop = chatArea.scrollHeight;
+    });
+  }
 
-    startBtn.onclick = async () => {
-      const roomId = roomInput.value.trim();
-      if (!roomId) {
-        alert('ルーム番号を入力してください');
-        return;
-      }
+  // メッセージ送信
+  sendBtn.onclick = async () => {
+    const text = msgInput.value.trim();
+    if (!text) return;
+    const roomRef = collection(db, "rooms", room, "messages");
+    await addDoc(roomRef, {
+      user: userId,
+      type: "text",
+      text: text,
+      time: serverTimestamp()
+    });
+    msgInput.value = "";
+  };
 
-      startBtn.disabled = true;
-      await startLocalStream();
-      createPeerConnection();
-
-      roomRef = firestore.collection('rooms').doc(roomId);
-      const roomSnapshot = await roomRef.get();
-
-      if (!roomSnapshot.exists) {
-        isCaller = true;
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await roomRef.set({ offer: { type: offer.type, sdp: offer.sdp } });
-
-        roomRef.onSnapshot(async snapshot => {
-          const data = snapshot.data();
-          if (!pc.currentRemoteDescription && data?.answer) {
-            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-          }
-        });
-
-        roomRef.collection('calleeCandidates').onSnapshot(snapshot => {
-          snapshot.docChanges().forEach(async change => {
-            if (change.type === 'added') {
-              const data = change.doc.data();
-              await pc.addIceCandidate(new RTCIceCandidate(data));
-            }
-          });
-        });
-
-      } else {
-        isCaller = false;
-        const data = roomSnapshot.data();
-        if (!data.offer) {
-          alert('このルームにはオファーがありません。');
-          startBtn.disabled = false;
-          return;
-        }
-        await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        await roomRef.update({ answer: { type: answer.type, sdp: answer.sdp } });
-
-        roomRef.collection('callerCandidates').onSnapshot(snapshot => {
-          snapshot.docChanges().forEach(async change => {
-            if (change.type === 'added') {
-              const data = change.doc.data();
-              await pc.addIceCandidate(new RTCIceCandidate(data));
-            }
-          });
-        });
-      }
+  // スタンプ送信
+  stamps.forEach(img => {
+    img.onclick = async () => {
+      const roomRef = collection(db, "rooms", room, "messages");
+      await addDoc(roomRef, {
+        user: userId,
+        type: "stamp",
+        src: img.src,
+        time: serverTimestamp()
+      });
     };
-
-    hangupBtn.onclick = async () => {
-      if (pc) pc.close();
-      if (localStream) localStream.getTracks().forEach(t => t.stop());
-      startBtn.disabled = false;
-    };
-  </script>
+  });
+</script>
 </body>
 </html>
