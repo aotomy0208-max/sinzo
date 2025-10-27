@@ -288,18 +288,22 @@ function deleteCookie(key){
     document.cookie = key+"=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;";
 }
 
-// 自動ログイン
+// 🔹 自動ログイン機能（完全版）
 window.addEventListener("load", async()=>{
     const savedName = getCookie("chatName");
-    if(savedName){
+    const savedPass = getCookie("chatPass");
+    if(savedName && savedPass){
         const userDoc = await getDoc(doc(db,"users",savedName));
         if(userDoc.exists()){
             const data = userDoc.data();
-            currentUser = {name:savedName,password:data.password,isAdmin:data.isAdmin};
-            accountUI.style.display="none";
-            roomSelect.style.display="flex";
-            userNameInput.value = savedName;
-            colorInput.value = "#3a7bfd";
+            if(data.password === savedPass){
+                currentUser = {name:savedName,password:data.password,isAdmin:data.isAdmin};
+                accountUI.style.display="none";
+                roomSelect.style.display="flex";
+                userNameInput.value = savedName;
+                colorInput.value = "#3a7bfd";
+                return;
+            }
         }
     }
 });
@@ -315,6 +319,7 @@ createAccountBtn.onclick=async()=>{
     await setDoc(userRef,{password:pass,isAdmin:false});
     currentUser={name:name,password:pass,isAdmin:false};
     setCookie("chatName",name,365);
+    setCookie("chatPass",pass,365);
     accountUI.style.display="none";
     roomSelect.style.display="flex";
 };
@@ -330,6 +335,7 @@ loginBtn.onclick=async()=>{
     if(data.password!==pass){alert("パスワード違う");return;}
     currentUser={name:name,password:pass,isAdmin:data.isAdmin};
     setCookie("chatName",name,365);
+    setCookie("chatPass",pass,365);
     accountUI.style.display="none";
     roomSelect.style.display="flex";
 };
@@ -337,10 +343,14 @@ loginBtn.onclick=async()=>{
 // ログアウト
 logoutBtn.onclick=()=>{
     deleteCookie("chatName");
+    deleteCookie("chatPass");
     currentUser=null;
     roomSelect.style.display="none";
     accountUI.style.display="flex";
 };
+
+// 以下（チャット機能など）はそのまま
+
 
 // 部屋入室
 function enterRoom(){
