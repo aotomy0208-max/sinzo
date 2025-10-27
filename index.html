@@ -288,7 +288,7 @@ function deleteCookie(key){
     document.cookie = key+"=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;";
 }
 
-// 🔹 自動ログイン機能（完全版）
+// 🔹 自動ログイン完全版
 window.addEventListener("load", async()=>{
     const savedName = getCookie("chatName");
     const savedPass = getCookie("chatPass");
@@ -297,10 +297,12 @@ window.addEventListener("load", async()=>{
         if(userDoc.exists()){
             const data = userDoc.data();
             if(data.password === savedPass){
+                // 自動ログイン実行
                 currentUser = {name:savedName,password:data.password,isAdmin:data.isAdmin};
-                accountUI.style.display="none";
-                roomSelect.style.display="flex";
                 userNameInput.value = savedName;
+                passwordInput.value = savedPass;
+                accountUI.style.display = "none";
+                roomSelect.style.display = "flex";
                 colorInput.value = "#3a7bfd";
                 return;
             }
@@ -348,9 +350,6 @@ logoutBtn.onclick=()=>{
     roomSelect.style.display="none";
     accountUI.style.display="flex";
 };
-
-// 以下（チャット機能など）はそのまま
-
 
 // 部屋入室
 function enterRoom(){
