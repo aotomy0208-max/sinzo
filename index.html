@@ -180,6 +180,43 @@ input, button, select {
     color: #ff0000; /* 赤色に変更、好きな色に変えてOK */
 }
 
+/* 💬 メッセージ共通 */
+.message-box {
+    display: flex;
+    margin: 10px 0;
+    align-items: flex-end;
+    max-width: 90%;
+    word-wrap: break-word;
+}
+
+/* 自分のメッセージ */
+.message-box.me {
+    justify-content: flex-end; /* 右寄せ */
+}
+.message-box.me .bubble {
+    color: #ffffff; /* 文字色 */
+    background: #3a7bfd; /* バブル背景色 */
+    border-radius: 18px;
+    max-width: 70%;
+    padding: 12px 16px;
+    font-size: 18px;
+    line-height: 1.4;
+}
+
+/* 相手のメッセージ */
+.message-box.other {
+    justify-content: flex-start; /* 左寄せ */
+}
+.message-box.other .bubble {
+    color: #ff0000; /* 文字色 */
+    background: #f2f5ff; /* バブル背景色 */
+    border-radius: 18px;
+    max-width: 70%;
+    padding: 12px 16px;
+    font-size: 18px;
+    line-height: 1.4;
+}
+
 </style>
 </head>
 <body>
